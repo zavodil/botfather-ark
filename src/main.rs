@@ -194,8 +194,8 @@ fn format_private_key(signing_key: &SigningKey) -> String {
 
 /// Get master key from environment (used for derivation only)
 fn get_master_key() -> Result<SigningKey, String> {
-    let key_str = env::var("BOT_FATHER_MASTER_KEY")
-        .map_err(|_| "BOT_FATHER_MASTER_KEY not found")?;
+    let key_str = env::var("PROTECTED_MASTER_KEY")
+        .map_err(|_| "PROTECTED_MASTER_KEY not found")?;
 
     parse_private_key(&key_str)
 }
