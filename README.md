@@ -240,7 +240,7 @@ User Input
 │ • Parse action    │
 │ • AI name gen     │◄──── HTTP (WASI P2)
 │ • Key derivation  │◄──── SHA-256 + ed25519
-│ • NEAR operations │◄──── near:rpc/api (WIT)
+│ • NEAR operations │◄──── near:rpc/api@0.1.0 (WIT)
 └───────────────────┘
     │
     ▼

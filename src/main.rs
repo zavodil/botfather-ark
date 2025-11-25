@@ -564,6 +564,7 @@ fn create_account(
         &args.to_string(),
         deposit,
         "300000000000000", // 300 TGas
+        "",                 // wait_until (empty = FINAL)
     );
 
     if !error.is_empty() {
@@ -750,7 +751,7 @@ fn handle_list_accounts(indices: Vec<u32>) -> Output {
     let accounts_with_balances: Vec<AccountInfo> = accounts
         .into_iter()
         .map(|mut acc| {
-            let (result, _) = near::rpc::api::view_account(&acc.account_id);
+            let (result, _) = near::rpc::api::view_account(&acc.account_id, ""); // finality (empty = final)
             if !result.is_empty() {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&result) {
                     if let Some(amount) = parsed.get("result").and_then(|r| r.get("amount")) {
@@ -871,6 +872,7 @@ fn handle_batch_call(
             &account_args,
             &deposit,
             &gas,
+            "",  // wait_until (empty = FINAL)
         );
 
         eprintln!("RPC call returned: tx_hash='{}', error='{}'", tx_hash, error);
@@ -1023,6 +1025,7 @@ fn handle_fund_accounts(total_amount: String, indices: Vec<u32>) -> Output {
             &signer_private_key,
             &account.account_id,
             &amount_per_account.to_string(),
+            "",  // wait_until (empty = FINAL)
         );
 
         eprintln!("Transfer returned: tx_hash='{}', error='{}'", tx_hash, error);
