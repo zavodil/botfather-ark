@@ -23,7 +23,7 @@ use std::io::{self, Read, Write};
 use std::time::Duration;
 use wasi_http_client::Client;
 
-// Generate bindings for near:rpc/api interface
+// Generate bindings for near:rpc/api@0.1.0 interface
 wit_bindgen::generate!({
     world: "bot-father",
     path: "wit",
