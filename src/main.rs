@@ -123,6 +123,7 @@ struct TxResult {
 #[derive(Debug, Deserialize)]
 struct PublicKeyApiResponse {
     account_ids: Vec<String>,
+    #[allow(dead_code)]
     public_key: String,
 }
 
