@@ -571,6 +571,37 @@ fn create_account(
         return Err(error);
     }
 
+    // Check transaction execution status
+    eprintln!("Checking transaction status for {}", tx_hash);
+    let (status_result, status_error) = near::rpc::api::tx_status(&tx_hash, signer_id, "");
+
+    if !status_error.is_empty() {
+        return Err(format!("Failed to check tx status: {}", status_error));
+    }
+
+    // Parse status to check if transaction succeeded
+    let status_json: serde_json::Value = serde_json::from_str(&status_result)
+        .map_err(|e| format!("Failed to parse tx status: {}", e))?;
+
+    // Check final_execution_status or status.Failure
+    if let Some(result) = status_json.get("result") {
+        // Check for Failure in status
+        if let Some(status_obj) = result.get("status") {
+            if let Some(failure) = status_obj.get("Failure") {
+                // Check if it's AccountAlreadyExists
+                if let Some(action_error) = failure.get("ActionError") {
+                    if let Some(kind) = action_error.get("kind") {
+                        if kind.get("AccountAlreadyExists").is_some() {
+                            return Err(format!("Account {} already exists", account_id));
+                        }
+                    }
+                }
+                // Other failure
+                return Err(format!("Transaction failed: {:?}", failure));
+            }
+        }
+    }
+
     Ok(tx_hash)
 }
 
@@ -649,16 +680,20 @@ fn handle_create_accounts(prompt: String, count: u32, deposit_per_account: Strin
 
     let mut new_accounts = Vec::new();
     let mut transactions = Vec::new();
+    let mut available_names = account_names.clone();
+    let mut created_count = 0u32;
 
-    for (i, account_id) in account_names.iter().enumerate() {
-        let index = next_index + i as u32;
+    while created_count < count && !available_names.is_empty() {
+        let account_id = available_names.remove(0);
+        let index = next_index + created_count;
         let derived_key = derive_signing_key(&master_key, &predecessor, index);
         let public_key = format_public_key(&VerifyingKey::from(&derived_key));
 
-        eprintln!("Creating account {} with key {}", account_id, public_key);
+        eprintln!("Attempting to create account {} (index {}) with key {}", account_id, index, public_key);
 
-        match create_account(&signer_id, &signer_private_key, account_id, &public_key, &deposit_per_account) {
+        match create_account(&signer_id, &signer_private_key, &account_id, &public_key, &deposit_per_account) {
             Ok(tx_hash) => {
+                eprintln!("✓ Account {} created successfully", account_id);
                 new_accounts.push(AccountInfo {
                     index,
                     account_id: account_id.clone(),
@@ -672,20 +707,38 @@ fn handle_create_accounts(prompt: String, count: u32, deposit_per_account: Strin
                     success: true,
                     error: None,
                 });
+                created_count += 1;
             }
             Err(e) => {
+                eprintln!("✗ Failed to create {}: {}", account_id, e);
                 transactions.push(TxResult {
                     account_id: account_id.clone(),
                     tx_hash: String::new(),
                     success: false,
-                    error: Some(e),
+                    error: Some(e.clone()),
                 });
+
+                // If account already exists and we still need more accounts, generate a new name
+                if e.contains("already exists") && created_count < count {
+                    eprintln!("Generating replacement name for {} (needed: {})", account_id, count - created_count);
+                    match generate_account_names(&prompt, 1) {
+                        Ok(mut new_names) if !new_names.is_empty() => {
+                            let new_name = new_names.remove(0);
+                            eprintln!("Generated replacement: {}", new_name);
+                            available_names.push(new_name);
+                        }
+                        _ => {
+                            eprintln!("Failed to generate replacement name, stopping");
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
 
-    let success = transactions.iter().any(|t| t.success);
-    next_index += count;
+    let success = created_count > 0;
+    next_index += created_count;
 
     Output {
         success,
